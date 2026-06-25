@@ -75,7 +75,7 @@
             <button onclick="iniciarEmpleado()">INGRESAR COMO EMPLEADO</button>
         </div>
 
-        <!-- PANEL ACCESO ADMINISTRADOR NATIVO (SIN PROMPT QUE SE TRABE) -->
+        <!-- PANEL ACCESO ADMINISTRADOR NATIVO -->
         <div style="padding: 0 15px; margin-top: 20px; text-align: center;">
             <p style="color: #64748b; font-size: 12px; font-weight: bold; margin-bottom: 5px;">PANEL DE CONTROL EXCLUSIVO</p>
             <input type="password" id="clave-admin-input" placeholder="Contraseña de Administrador" style="border-color: #334155;">
@@ -98,8 +98,15 @@
 
     <!-- SECCIÓN 3: ADMINISTRACIÓN -->
     <div id="p-admin" class="seccion">
+        
+        <!-- SELECCIÓN DE FECHA / CALENDARIO -->
+        <div style="margin-bottom: 15px; text-align: center;">
+            <label style="color: #94a3b8; font-size: 11px; font-weight: bold; display: block; margin-bottom: 4px;">VER HISTORIAL DE VENTAS POR FECHA:</label>
+            <input type="date" id="filtro-fecha-admin" onchange="cargarVentasPorFecha()" style="border: 1px solid var(--azul-mar); padding: 8px; font-size: 14px; width: 80%; max-width: 250px; margin: 0 auto;">
+        </div>
+
         <div style="background:#141f32; padding:12px; border-radius:10px; text-align:center; margin-bottom:15px; border:1px solid var(--turquesa)">
-            <h4 style="margin:0; color:#94a3b8; font-size: 11px;">VENTAS ACUMULADAS HOY</h4>
+            <h4 style="margin:0; color:#94a3b8; font-size: 11px;">VENTAS TOTALES DE LA FECHA</h4>
             <h2 id="ventas-acumuladas" style="color:var(--turquesa); margin:2px 0; font-size: 24px;">$0</h2>
         </div>
         
@@ -127,9 +134,9 @@
 
         <div id="lista-productos-admin"></div>
 
-        <h3 style="color:var(--azul-mar); font-size: 14px; margin-top: 25px; border-bottom: 1px solid #223147; padding-bottom: 5px;">📊 RENDIMIENTO DE EMPLEADOS HOY</h3>
+        <h3 id="titulo-rendimiento" style="color:var(--azul-mar); font-size: 14px; margin-top: 25px; border-bottom: 1px solid #223147; padding-bottom: 5px;">📊 RENDIMIENTO DE EMPLEADOS</h3>
         <div id="historial-ventas-carlos" style="margin-top: 10px;">
-            <p style="text-align:center; color:#64748b; font-size:12px;">No hay registros de empleados hoy.</p>
+            <p style="text-align:center; color:#64748b; font-size:12px;">No hay registros para esta fecha.</p>
         </div>
 
         <button onclick="location.reload()" style="background:#222; color:white; margin-top:35px; padding: 10px;">CERRAR SESIÓN</button>
@@ -150,30 +157,19 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let catalogo = [
-    {cat: "Carnes", nom: "Paleta de Carnero", stock: 20, pre: 1200, visible: true},
-    {cat: "Mariscos", nom: "Camarones", stock: 50, pre: 6200, visible: true},
-    {cat: "Mariscos", nom: "Almejas", stock: 50, pre: 2200, visible: true},
-    {cat: "Mariscos", nom: "Ostiones", stock: 30, pre: 3500, visible: true},
-    {cat: "Carnes", nom: "Carne Caguma", stock: 30, pre: 3000, visible: true},
-    {cat: "Mariscos", nom: "Pulpo", stock: 20, pre: 4000, visible: true},
-    {cat: "Mariscos", nom: "Calamar Nacional", stock: 20, pre: 5200, visible: true},
-    {cat: "Mariscos", nom: "Colas de Langosta (masa)", stock: 15, pre: 4000, visible: true},
-    {cat: "Mariscos", nom: "Muelas de Cangrejo", stock: 20, pre: 2500, visible: true},
-    {cat: "Mariscos", nom: "Jaiba limpia", stock: 20, pre: 2500, visible: true},
-    {cat: "Mariscos", nom: "Masa de Cangrejo", stock: 20, pre: 2500, visible: true},
-    {cat: "Pescados", nom: "Pargo Limpio", stock: 30, pre: 1000, visible: true},
-    {cat: "Pescados", nom: "Pargo c/tripas", stock: 30, pre: 3000, visible: true},
-    {cat: "Pescados", nom: "Cojinuas", stock: 30, pre: 2100, visible: true},
-    {cat: "Pescados", nom: "Sardinas", stock: 30, pre: 2100, visible: true},
-    {cat: "Filetes", nom: "Filete de Castero", stock: 20, pre: 4200, visible: true},
-    {cat: "Filetes", nom: "Filete de Pargo", stock: 20, pre: 4000, visible: true},
-    {cat: "Filetes", nom: "Filete de Robalo", stock: 20, pre: 4000, visible: true},
-    {cat: "Filetes", nom: "Filete de Merluza", stock: 20, pre: 4000, visible: true}
-];
-
+let catalogo = [];
 let categoriaSeleccionada = "";
 let empleadoActual = "";
+let baseVentasGlobal = {}; // Guardará las ventas en tiempo real
+
+// Al cargar la página, ponemos la fecha de hoy en el input del calendario
+window.onload = function() {
+    const hoy = new Date();
+    const año = hoy.getFullYear();
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    document.getElementById('filtro-fecha-admin').value = `${año}-${mes}-${dia}`;
+};
 
 function accesoAdminNativo() {
     const claveInput = document.getElementById('clave-admin-input').value.trim();
@@ -183,6 +179,7 @@ function accesoAdminNativo() {
         document.getElementById('p-admin').classList.add('activa');
         categoriaSeleccionada = ""; 
         renderizarTodo();
+        cargarVentasPorFecha();
     } else {
         alert("Contraseña incorrecta.");
     }
@@ -191,64 +188,84 @@ function accesoAdminNativo() {
 db.ref('config/productos').on('value', (snap) => {
     if(snap.exists()) {
         catalogo = snap.val();
-    } else {
-        db.ref('config/productos').set(catalogo);
     }
     renderizarTodo();
 });
 
+// Escucha todas las ventas de la historia y las procesa
 db.ref('ventas').on('value', (snap) => {
+    if(snap.exists()) {
+        baseVentasGlobal = snap.val();
+    } else {
+        baseVentasGlobal = {};
+    }
+    if (document.getElementById('p-admin').classList.contains('activa')) {
+        cargarVentasPorFecha();
+    }
+});
+
+// 🔍 FUNCIÓN CLAVE: FILTRAR Y PROCESAR VENTAS SEGÚN LA FECHA SELECCIONADA
+function cargarVentasPorFecha() {
     const contenedorHistorial = document.getElementById('historial-ventas-carlos');
-    let totalDineroHoy = 0;
-    let hoy = new Date().toLocaleDateString();
+    const fechaInput = document.getElementById('filtro-fecha-admin').value; // Formato YYYY-MM-DD
+    
+    if(!fechaInput) return;
+
+    // Convertir YYYY-MM-DD a formato local dd/mm/aaaa
+    const partes = fechaInput.split('-');
+    const fechaBuscada = `${parseInt(partes[2])}/${parseInt(partes[1])}/${partes[0]}`;
+
+    let totalDineroFecha = 0;
     let acumuladoEmpleados = {};
 
-    if(snap.exists()) {
-        snap.forEach(h => {
-            const v = h.val();
-            if(v.fecha === hoy) {
-                totalDineroHoy += v.totalVenta;
-                let empNormalizado = v.empleado.trim().toUpperCase();
-                
-                if(!acumuladoEmpleados[empNormalizado]) {
-                    acumuladoEmpleados[empNormalizado] = {
-                        nombre: empNormalizado,
-                        totalDinero: 0,
-                        productos: {}
-                    };
-                }
-                acumuladoEmpleados[empNormalizado].totalDinero += v.totalVenta;
-                
-                if(!acumuladoEmpleados[empNormalizado].productos[v.producto]) {
-                    acumuladoEmpleados[empNormalizado].productos[v.producto] = 0;
-                }
-                acumuladoEmpleados[empNormalizado].productos[v.producto] += v.libras;
+    for (let key in baseVentasGlobal) {
+        const v = baseVentasGlobal[key];
+        
+        // Comparamos la fecha guardada con la seleccionada en el calendario
+        if(v.fecha === fechaBuscada) {
+            totalDineroFecha += v.totalVenta;
+            let empNormalizado = v.empleado.trim().toUpperCase();
+            
+            if(!acumuladoEmpleados[empNormalizado]) {
+                acumuladoEmpleados[empNormalizado] = {
+                    nombre: empNormalizado,
+                    totalDinero: 0,
+                    productos: {}
+                };
             }
-        });
-
-        let html = "";
-        for(let emp in acumuladoEmpleados) {
-            let datos = acumuladoEmpleados[emp];
-            let listaProductosHTML = "";
-            for(let prod in datos.productos) {
-                listaProductosHTML += `• <b>${prod}:</b> ${datos.productos[prod].toFixed(2)} lb<br>`;
+            acumuladoEmpleados[empNormalizado].totalDinero += v.totalVenta;
+            
+            if(!acumuladoEmpleados[empNormalizado].productos[v.producto]) {
+                acumuladoEmpleados[empNormalizado].productos[v.producto] = 0;
             }
-
-            html += `
-            <div class="tarjeta-empleado-acumulado">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:5px; margin-bottom:5px;">
-                    <span style="font-weight:900; color:#0f172a; font-size:14px;">👤 ${datos.nombre}</span>
-                    <span style="font-weight:900; color:var(--turquesa); font-size:15px;">$${datos.totalDinero.toLocaleString()}</span>
-                </div>
-                <div style="font-size:12px; color:#475569; line-height:1.4;">
-                    ${listaProductosHTML}
-                </div>
-            </div>`;
+            acumuladoEmpleados[empNormalizado].productos[v.producto] += v.libras;
         }
-        contenedorHistorial.innerHTML = html || `<p style="text-align:center; color:#64748b; font-size:12px;">No hay registros de empleados hoy.</p>`;
     }
-    document.getElementById('ventas-acumuladas').innerText = "$" + totalDineroHoy.toLocaleString();
-});
+
+    let html = "";
+    for(let emp in acumuladoEmpleados) {
+        let datos = acumuladoEmpleados[emp];
+        let listaProductosHTML = "";
+        for(let prod in datos.productos) {
+            listaProductosHTML += `• <b>${prod}:</b> ${datos.productos[prod].toFixed(2)} lb<br>`;
+        }
+
+        html += `
+        <div class="tarjeta-empleado-acumulado">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:5px; margin-bottom:5px;">
+                <span style="font-weight:900; color:#0f172a; font-size:14px;">👤 ${datos.nombre}</span>
+                <span style="font-weight:900; color:var(--turquesa); font-size:15px;">$${datos.totalDinero.toLocaleString()}</span>
+            </div>
+            <div style="font-size:12px; color:#475569; line-height:1.4;">
+                ${listaProductosHTML}
+            </div>
+        </div>`;
+    }
+
+    document.getElementById('titulo-rendimiento').innerText = `📊 RENDIMIENTO DE EMPLEADOS (${fechaBuscada})`;
+    contenedorHistorial.innerHTML = html || `<p style="text-align:center; color:#64748b; font-size:12px;">No hay registros para esta fecha.</p>`;
+    document.getElementById('ventas-acumuladas').innerText = "$" + totalDineroFecha.toLocaleString();
+}
 
 function irSeccion(id) {
     document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
@@ -344,7 +361,6 @@ function registrarVenta(i) {
     alert("Venta guardada exitosamente.");
 }
 
-// 🛡️ PANEL DE ADMIN: EDICIÓN COMPLETA DE PRECIO Y STOCK SIN VENTANAS INTERRUMPIDAS
 function renderizarAdmin() {
     if (!categoriaSeleccionada) {
         document.getElementById('lista-productos-admin').innerHTML = `<p style="text-align:center; color:#64748b; font-size:12px; margin-top:10px;">Selecciona una categoría.</p>`;
@@ -367,16 +383,11 @@ function renderizarAdmin() {
                     </div>
                 </div>
             </div>
-            
-            <!-- CONTROLES NATIVOS PARA PRECIO Y LIBRAS -->
             <div style="display:flex; gap:5px; flex-wrap: wrap;">
-                <!-- Cambiar Precio -->
                 <div style="display:flex; flex:1; min-width:130px; gap:3px;">
                     <input type="number" id="nuevo-pre-${i}" placeholder="Nvo Precio" style="margin:0; padding:6px; font-size:11px; height:32px;">
                     <button onclick="guardarPrecioNativo(${i})" style="width:40px; background:var(--azul-mar); margin:0; padding:6px; font-size:11px; border-radius:6px; height:32px;">$</button>
                 </div>
-                
-                <!-- Cambiar Libras (STOCK) -->
                 <div style="display:flex; flex:1; min-width:130px; gap:3px;">
                     <input type="number" step="0.01" id="nuevo-stock-${i}" placeholder="Nvas Libras" style="margin:0; padding:6px; font-size:11px; height:32px;">
                     <button onclick="guardarStockNativo(${i})" style="width:40px; background:var(--turquesa); margin:0; padding:6px; font-size:11px; border-radius:6px; height:32px;">Lb</button>
