@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pescadería PRO - Seguro</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="shortcut icon" href="icon.jpg">
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Pescadería PRO">
+    <meta name="theme-color" content="#0f172a">
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root { 
+            --azul-mar: #0ea5e9;       
+            --fondo-oceano: #0f172a;  
+            --gris-marino: #1e293b;   
+            --turquesa: #2ecc71;      
+            --coral: #e74c3c;         
+            --blanco: #f8fafc;
+        }
+        
+        body { background: var(--fondo-oceano); color: var(--blanco); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; }
+        .seccion { display: none; padding: 15px; }
+        .activa { display: block; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .container { max-width: 500px; margin: auto; background: #0b111e; min-height: 100vh; border: 1px solid #1e293b; position: relative; box-sizing: border-box; }
+        
+        input, button, select { width: 100%; padding: 12px; margin: 6px 0; border-radius: 10px; border: 1px solid var(--azul-mar); font-weight: bold; box-sizing: border-box; font-size: 14px; }
+        input, select { background: #1e293b; color: white; border: 1px solid #334155; text-align: center; }
+        
+        button { background: var(--azul-mar); color: #fff; cursor: pointer; border: none; }
+        button:hover { opacity: 0.9; }
+        
+        .grid-filtros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 12px; }
+        .btn-filtro { padding: 8px 2px; font-size: 11px; border-radius: 8px; background: #1e293b; color: #94a3b8; border: 1px solid #334155; font-weight: bold; margin: 0; text-align: center; }
+        .btn-filtro.activo { background: var(--azul-mar); color: white; border-color: var(--azul-mar); }
+
+        .cat-titulo { color: var(--azul-mar); padding: 4px 0; margin: 10px 0 5px; font-weight: bold; font-size: 13px; text-transform: uppercase; border-bottom: 1px dashed #334155; letter-spacing: 1px; }
+        
+        .producto-card { background: var(--gris-marino); padding: 10px; border-radius: 10px; margin-bottom: 8px; border: 1px solid #223147; }
+        .flex-row { display: flex; justify-content: space-between; align-items: center; }
+        
+        .stock-grande { font-size: 18px; font-weight: 900; color: var(--blanco); }
+        .precio-abajo { color: var(--turquesa); font-size: 13px; font-weight: bold; margin-top: 2px; }
+        
+        .tarjeta-empleado-acumulado { background: white; color: #0f172a; padding: 12px; border-radius: 10px; margin-bottom: 10px; border-left: 6px solid var(--azul-mar); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .modal-formulario { background: #141f32; padding: 15px; border-radius: 12px; border: 2px solid var(--azul-mar); margin-top: 15px; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div id="p-inicio" class="seccion activa">
+        <div style="text-align:center; margin-top:40px;">
+            <div style="width: 105px; height: 105px; border-radius: 50%; background: linear-gradient(45deg, #0284c7, #0ea5e9); display: flex; align-items: center; justify-content: center; margin: 0 auto; border: 3px solid var(--azul-mar);">
+                <span style="font-size: 45px;">🐟</span>
+            </div>
+            <h1 style="letter-spacing:2px; margin-top:15px; color: var(--azul-mar); font-size: 24px;">PESCADERÍA PRO</h1>
+            <p style="color: #64748b; margin-top: -8px; font-weight: bold; font-size: 13px;">Control de Inventario</p>
+        </div>
+        
+        <div style="padding: 0 15px; margin-top: 25px; border-bottom: 1px dashed #223147; padding-bottom: 25px;">
+            <input type="text" id="nombre-empleado" placeholder="Nombre del Empleado">
+            <button onclick="iniciarEmpleado()">INGRESAR COMO EMPLEADO</button>
+        </div>
+
+        <div style="padding: 0 15px; margin-top: 20px; text-align: center;">
+            <p style="color: #64748b; font-size: 12px; font-weight: bold; margin-bottom: 5px;">PANEL DE CONTROL EXCLUSIVO</p>
+            <input type="password" id="clave-admin-input" placeholder="Contraseña de Administrador" style="border-color: #334155;">
+            <button style="background: #1e293b; color: var(--azul-mar); border: 1px solid var(--azul-mar);" onclick="accesoAdminNativo()">ENTRAR COMO ADMINISTRADOR</button>
+        </div>
+    </div>
+
+    <div id="p-empleado" class="seccion">
+        <h3 id="saludo-empleado" style="color:white; text-align:center; margin: 0 0 12px 0; font-size: 15px; text-transform: uppercase;">📦</h3>
+        
+        <div class="grid-filtros" id="filtros-empleado"></div>
+
+        <div id="lista-productos-ventas">
+            <p style="text-align:center; color:#64748b; font-size:12px; margin-top:20px;">Selecciona una categoría para ver productos.</p>
+        </div>
+        
+        <button onclick="location.reload()" style="background:#111; color:#64748b; border: 1px solid #223147; margin-top:25px; padding: 10px;">VOLVER AL INICIO</button>
+    </div>
+
+    <div id="p-admin" class="seccion">
+        <div style="background:#141f32; padding:12px; border-radius:10px; text-align:center; margin-bottom:15px; border:1px solid var(--turquesa)">
+            <h4 style="margin:0; color:#94a3b8; font-size: 11px;">VENTAS ACUMULADAS HOY</h4>
+            <h2 id="ventas-acumuladas" style="color:var(--turquesa); margin:2px 0; font-size: 24px;">$0</h2>
+        </div>
+        
+        <div class="grid-filtros" id="filtros-admin"></div>
+
+        <button onclick="toggleModalProducto()" style="background: #1e293b; color: var(--azul-mar); border: 1px solid var(--azul-mar); padding: 8px; font-size: 12px; border-radius: 8px; font-weight: bold; margin-bottom: 10px;">➕ AGREGAR PRODUCTO SOLO</button>
+
+        <div id="modal-registro" class="modal-formulario">
+            <h4 style="margin: 0 0 10px 0; font-size: 14px; text-align:center; color: var(--azul-mar);">Nuevo Producto</h4>
+            <select id="reg-categoria">
+                <option value="Pescados">Pescados</option>
+                <option value="Mariscos">Mariscos</option>
+                <option value="Filetes">Filetes</option>
+                <option value="Carnes">Carnes</option>
+            </select>
+            <input type="text" id="reg-nombre" placeholder="Nombre del producto">
+            <input type="number" step="0.01" id="reg-stock" placeholder="Cantidad (Libras)">
+            <input type="number" id="reg-precio" placeholder="Precio ($)">
+            
+            <div style="display:flex; gap:8px; margin-top:5px;">
+                <button onclick="guardarNuevoProducto()" style="background: var(--turquesa); padding: 10px; font-size: 12px;">GUARDAR</button>
+                <button onclick="toggleModalProducto()" style="background: #334155; padding: 10px; font-size: 12px;">CANCELAR</button>
+            </div>
+        </div>
+
+        <div id="lista-productos-admin"></div>
+
+        <h3 style="color:var(--azul-mar); font-size: 14px; margin-top: 25px; border-bottom: 1px solid #223147; padding-bottom: 5px;">📊 RENDIMIENTO DE EMPLEADOS HOY</h3>
+        <div id="historial-ventas-carlos" style="margin-top: 10px;">
+            <p style="text-align:center; color:#64748b; font-size:12px;">No hay registros de empleados hoy.</p>
+        </div>
+
+        <button onclick="location.reload()" style="background:#222; color:white; margin-top:35px; padding: 10px;">CERRAR SESIÓN</button>
+    </div>
+</div>
+
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyBbEgG3iBK4XY19sNGR3b7I_fF1IbBAbAE",
+    authDomain: "pescaderia-app.firebaseapp.com",
+    projectId: "pescaderia-app",
+    storageBucket: "pescaderia-app.firebasestorage.app",
+    messagingSenderId: "737814375199",
+    appId: "1:737814375199:web:1a7f95aadd4ef77f945e2a",
+    databaseURL: "https://pescaderia-app-default-rtdb.firebaseio.com"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let catalogo = [
+    {cat: "Carnes", nom: "Paleta de Carnero", stock: 20, pre: 1200, visible: true},
+    {cat: "Mariscos", nom: "Camarones", stock: 50, pre: 6200, visible: true},
+    {cat: "Mariscos", nom: "Almejas", stock: 50, pre: 2200, visible: true},
+    {cat: "Mariscos", nom: "Ostiones", stock: 30, pre: 3500, visible: true},
+    {cat: "Carnes", nom: "Carne Caguma", stock: 30, pre: 3000, visible: true},
+    {cat: "Mariscos", nom: "Pulpo", stock: 20, pre: 4000, visible: true},
+    {cat: "Mariscos", nom: "Calamar Nacional", stock: 20, pre: 5200, visible: true},
+    {cat: "Mariscos", nom: "Colas de Langosta (masa)", stock: 15, pre: 4000, visible: true},
+    {cat: "Mariscos", nom: "Muelas de Cangrejo", stock: 20, pre: 2500, visible: true},
+    {cat: "Mariscos", nom: "Jaiba limpia", stock: 20, pre: 2500, visible: true},
+    {cat: "Mariscos", nom: "Masa de Cangrejo", stock: 20, pre: 2500, visible: true},
+    {cat: "Pescados", nom: "Pargo Limpio", stock: 30, pre: 1000, visible: true},
+    {cat: "Pescados", nom: "Pargo c/tripas", stock: 30, pre: 3000, visible: true},
+    {cat: "Pescados", nom: "Cojinuas", stock: 30, pre: 2100, visible: true},
+    {cat: "Pescados", nom: "Sardinas", stock: 30, pre: 2100, visible: true},
+    {cat: "Filetes", nom: "Filete de Castero", stock: 20, pre: 4200, visible: true},
+    {cat: "Filetes", nom: "Filete de Pargo", stock: 20, pre: 4000, visible: true},
+    {cat: "Filetes", nom: "Filete de Robalo", stock: 20, pre: 4000, visible: true},
+    {cat: "Filetes", nom: "Filete de Merluza", stock: 20, pre: 4000, visible: true}
+];
+
+let categoriaSeleccionada = "";
+let empleadoActual = "";
+
+// FUNCIÓN NATIVA: YA NO SE TRABA NUNCA PORQUE NO USA PROMPT EXTERNO
+function accesoAdminNativo() {
+    const claveInput = document.getElementById('clave-admin-input').value.trim();
+    if (claveInput === "1234") {
+        document.getElementById('clave-admin-input').value = ""; // Limpiar
+        document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
+        document.getElementById('p-admin').classList.add('activa');
+        categoriaSeleccionada = ""; 
+        renderizarTodo();
+    } else {
+        alert("Contraseña incorrecta.");
+    }
+}
+
+db.ref('config/productos').on('value', (snap) => {
+    if(snap.exists()) {
+        catalogo = snap.val();
+    } else {
+        db.ref('config/productos').set(catalogo);
+    }
+    renderizarTodo();
+});
+
+db.ref('ventas').on('value', (snap) => {
+    const contenedorHistorial = document.getElementById('historial-ventas-carlos');
+    let totalDineroHoy = 0;
+    let hoy = new Date().toLocaleDateString();
+    let acumuladoEmpleados = {};
+
+    if(snap.exists()) {
+        snap.forEach(h => {
+            const v = h.val();
+            if(v.fecha === hoy) {
+                totalDineroHoy += v.totalVenta;
+                let empNormalizado = v.empleado.trim().toUpperCase();
+                
+                if(!acumuladoEmpleados[empNormalizado]) {
+                    acumuladoEmpleados[empNormalizado] = {
+                        nombre: empNormalizado,
+                        totalDinero: 0,
+                        productos: {}
+                    };
+                }
+                acumuladoEmpleados[empNormalizado].totalDinero += v.totalVenta;
+                
+                if(!acumuladoEmpleados[empNormalizado].productos[v.producto]) {
+                    acumuladoEmpleados[empNormalizado].productos[v.producto] = 0;
+                }
+                acumuladoEmpleados[empNormalizado].productos[v.producto] += v.libras;
+            }
+        });
+
+        let html = "";
+        for(let emp in acumuladoEmpleados) {
+            let datos = acumuladoEmpleados[emp];
+            let listaProductosHTML = "";
+            for(let prod in datos.productos) {
+                listaProductosHTML += `• <b>${prod}:</b> ${datos.productos[prod].toFixed(2)} lb<br>`;
+            }
+
+            html += `
+            <div class="tarjeta-empleado-acumulado">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:5px; margin-bottom:5px;">
+                    <span style="font-weight:900; color:#0f172a; font-size:14px;">👤 ${datos.nombre}</span>
+                    <span style="font-weight:900; color:var(--turquesa); font-size:15px;">$${datos.totalDinero.toLocaleString()}</span>
+                </div>
+                <div style="font-size:12px; color:#475569; line-height:1.4;">
+                    ${listaProductosHTML}
+                </div>
+            </div>`;
+        }
+        contenedorHistorial.innerHTML = html || `<p style="text-align:center; color:#64748b; font-size:12px;">No hay registros de empleados hoy.</p>`;
+    }
+    document.getElementById('ventas-acumuladas').innerText = "$" + totalDineroHoy.toLocaleString();
+});
+
+function irSeccion(id) {
+    document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
+    document.getElementById(id).classList.add('activa');
+    renderizarTodo();
+}
+
+function iniciarEmpleado() {
+    const inputNombre = document.getElementById('nombre-empleado').value.trim();
+    if(!inputNombre) return alert("Por favor, ingresa tu nombre.");
+    empleadoActual = inputNombre;
+    document.getElementById('saludo-empleado').innerText = "🧑‍💻 EMPLEADO: " + empleadoActual.toUpperCase();
+    irSeccion('p-empleado');
+}
+
+function generarFiltros(contenedorId) {
+    const categories = ["Pescados", "Mariscos", "Filetes", "Carnes"];
+    let html = "";
+    categories.forEach(c => {
+        const claseActiva = (c === categoriaSeleccionada) ? "activo" : "";
+        html += `<div class="btn-filtro ${claseActiva}" onclick="cambiarCategoria('${c}')">${c.toUpperCase()}</div>`;
+    });
+    document.getElementById(contenedorId).innerHTML = html;
+}
+
+function cambiarCategoria(cat) {
+    categoriaSeleccionada = cat;
+    renderizarTodo();
+}
+
+function renderizarTodo() {
+    if (document.getElementById('p-empleado').classList.contains('activa')) {
+        generarFiltros('filtros-empleado');
+        renderizarEmpleado();
+    }
+    if (document.getElementById('p-admin').classList.contains('activa')) {
+        generarFiltros('filtros-admin');
+        renderizarAdmin();
+    }
+}
+
+function renderizarEmpleado() {
+    if (!categoriaSeleccionada) return;
+    let html = `<div class="cat-titulo">${categoriaSeleccionada}</div>`;
+    let encontrados = 0;
+
+    catalogo.forEach((p, i) => {
+        if (p.cat !== categoriaSeleccionada || p.visible === false) return;
+        encontrados++;
+
+        html += `
+        <div class="producto-card">
+            <div class="flex-row">
+                <div>
+                    <span style="font-size: 14px; font-weight: bold; color: #fff;">${p.nom}</span>
+                    <div class="precio-abajo">$${p.pre} / lb</div>
+                </div>
+                <div style="text-align: right;">
+                    <span class="stock-grande">${p.stock}</span> <span style="font-size:11px; color:#64748b;">lb</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:6px; margin-top: 8px;">
+                <input type="number" step="0.01" id="cant-${i}" placeholder="Libras" style="margin:0; padding:8px; font-size:12px;">
+                <button onclick="registrarVenta(${i})" style="width:100px; background:var(--turquesa); margin:0; padding:8px; font-size:11px; border-radius:8px;">VENDER</button>
+            </div>
+        </div>`;
+    });
+
+    document.getElementById('lista-productos-ventas').innerHTML = encontrados > 0 ? html : `<p style="text-align:center; color:#64748b; font-size:12px;">No hay productos.</p>`;
+}
+
+function registrarVenta(i) {
+    const input = document.getElementById(`cant-${i}`);
+    const cantidad = parseFloat(input.value);
+    
+    if(!cantidad || cantidad <= 0) return alert("Ingresa una cantidad válida.");
+    if(cantidad > catalogo[i].stock) return alert("Stock insuficiente.");
+    
+    catalogo[i].stock = parseFloat((catalogo[i].stock - cantidad).toFixed(2));
+    const costoTotal = PlatformCostTotal = cantidad * catalogo[i].pre;
+    
+    db.ref('config/productos').set(catalogo);
+    
+    db.ref('ventas').push({
+        empleado: empleadoActual,
+        producto: catalogo[i].nom,
+        libras: cantidad,
+        totalVenta: costoTotal,
+        fecha: new Date().toLocaleDateString()
+    });
+
+    input.value = "";
+    alert("Venta guardada exitosamente.");
+}
+
+// 🛡️ ADMIN MODIFICADO: CON ENTRADA DE TEXTO INLINE EN VEZ DE PROMPT
+function renderizarAdmin() {
+    if (!categoriaSeleccionada) {
+        document.getElementById('lista-productos-admin').innerHTML = `<p style="text-align:center; color:#64748b; font-size:12px; margin-top:10px;">Selecciona una categoría.</p>`;
+        return;
+    }
+    let html = `<div class="cat-titulo">${categoriaSeleccionada}</div>`;
+    let encontrados = 0;
+
+    catalogo.forEach((p, i) => {
+        if (p.cat !== categoriaSeleccionada) return;
+        encontrados++;
+
+        html += `
+        <div class="producto-card" style="border-left: 2px solid var(--azul-mar); padding: 10px;">
+            <div class="flex-row">
+                <div>
+                    <b style="font-size: 13px; color:white;">${p.nom}</b>
+                    <div style="font-size: 11px; color:#64748b;">Quedan: <b style="color:white;">${p.stock} lb</b> | Precio: <b style="color:var(--turquesa);">$${p.pre}</b></div>
+                </div>
+            </div>
+            <div style="display:flex; gap:6px; margin-top:6px; align-items:center;">
+                <input type="number" id="nuevo-pre-${i}" placeholder="Nuevo Precio" style="margin:0; padding:6px; font-size:12px; height:32px;">
+                <button onclick="guardarPrecioNativo(${i})" style="width:50px; background:var(--azul-mar); margin:0; padding:6px; font-size:11px; border-radius:6px; height:32px;">OK</button>
+            </div>
+        </div>`;
+    });
+
+    document.getElementById('lista-productos-admin').innerHTML = encontrados > 0 ? html : `<p style="text-align:center; color:#64748b; font-size:12px;">Sin productos.</p>`;
+}
+
+function guardarPrecioNativo(i) {
+    const inputPrecio = document.getElementById(`nuevo-pre-${i}`);
+    const valor = parseFloat(inputPrecio.value);
+    if(isNaN(valor) || valor < 0) return alert("Monto no válido.");
+    
+    catalogo[i].pre = valor;
+    db.ref('config/productos').set(catalogo);
+    alert("Precio actualizado.");
+}
+
+function toggleModalProducto() {
+    const m = document.getElementById('modal-registro');
+    m.style.display = m.style.display === 'block' ? 'none' : 'block';
+}
+
+function guardarNuevoProducto() {
+    const cat = document.getElementById('reg-categoria').value;
+    const nom = document.getElementById('reg-nombre').value;
+    const stock = parseFloat(document.getElementById('reg-stock').value);
+    const pre = parseFloat(document.getElementById('reg-precio').value);
+
+    if(!nom || isNaN(stock) || isNaN(pre)) return alert("Rellena todos los campos.");
+
+    catalogo.unshift({ cat: cat, nom: nom, stock: stock, pre: pre, visible: true });
+    db.ref('config/productos').set(catalogo);
+    
+    document.getElementById('reg-nombre').value = "";
+    document.getElementById('reg-stock').value = "";
+    document.getElementById('reg-precio').value = "";
+    toggleModalProducto();
+    
+    categoriaSeleccionada = cat;
+    renderizarTodo();
+    alert("¡Producto añadido!");
+}
+</script>
+</body>
+</html>
