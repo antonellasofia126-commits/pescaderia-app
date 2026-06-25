@@ -12,6 +12,7 @@
     <meta name="apple-mobile-web-app-title" content="Pescadería PRO">
     <meta name="theme-color" content="#0f172a">
 
+    <!-- LIBRERÍAS FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
@@ -58,6 +59,7 @@
 
 <div class="container">
     
+    <!-- SECCIÓN 1: INICIO -->
     <div id="p-inicio" class="seccion activa">
         <div style="text-align:center; margin-top:40px;">
             <div style="width: 105px; height: 105px; border-radius: 50%; background: linear-gradient(45deg, #0284c7, #0ea5e9); display: flex; align-items: center; justify-content: center; margin: 0 auto; border: 3px solid var(--azul-mar);">
@@ -67,11 +69,13 @@
             <p style="color: #64748b; margin-top: -8px; font-weight: bold; font-size: 13px;">Control de Inventario</p>
         </div>
         
+        <!-- PANEL ACCESO EMPLEADOS -->
         <div style="padding: 0 15px; margin-top: 25px; border-bottom: 1px dashed #223147; padding-bottom: 25px;">
             <input type="text" id="nombre-empleado" placeholder="Nombre del Empleado">
             <button onclick="iniciarEmpleado()">INGRESAR COMO EMPLEADO</button>
         </div>
 
+        <!-- PANEL ACCESO ADMINISTRADOR NATIVO (SIN PROMPT QUE SE TRABE) -->
         <div style="padding: 0 15px; margin-top: 20px; text-align: center;">
             <p style="color: #64748b; font-size: 12px; font-weight: bold; margin-bottom: 5px;">PANEL DE CONTROL EXCLUSIVO</p>
             <input type="password" id="clave-admin-input" placeholder="Contraseña de Administrador" style="border-color: #334155;">
@@ -79,6 +83,7 @@
         </div>
     </div>
 
+    <!-- SECCIÓN 2: EMPLEADO -->
     <div id="p-empleado" class="seccion">
         <h3 id="saludo-empleado" style="color:white; text-align:center; margin: 0 0 12px 0; font-size: 15px; text-transform: uppercase;">📦</h3>
         
@@ -91,6 +96,7 @@
         <button onclick="location.reload()" style="background:#111; color:#64748b; border: 1px solid #223147; margin-top:25px; padding: 10px;">VOLVER AL INICIO</button>
     </div>
 
+    <!-- SECCIÓN 3: ADMINISTRACIÓN -->
     <div id="p-admin" class="seccion">
         <div style="background:#141f32; padding:12px; border-radius:10px; text-align:center; margin-bottom:15px; border:1px solid var(--turquesa)">
             <h4 style="margin:0; color:#94a3b8; font-size: 11px;">VENTAS ACUMULADAS HOY</h4>
@@ -169,11 +175,10 @@ let catalogo = [
 let categoriaSeleccionada = "";
 let empleadoActual = "";
 
-// FUNCIÓN NATIVA: YA NO SE TRABA NUNCA PORQUE NO USA PROMPT EXTERNO
 function accesoAdminNativo() {
     const claveInput = document.getElementById('clave-admin-input').value.trim();
     if (claveInput === "1234") {
-        document.getElementById('clave-admin-input').value = ""; // Limpiar
+        document.getElementById('clave-admin-input').value = ""; 
         document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
         document.getElementById('p-admin').classList.add('activa');
         categoriaSeleccionada = ""; 
@@ -323,7 +328,7 @@ function registrarVenta(i) {
     if(cantidad > catalogo[i].stock) return alert("Stock insuficiente.");
     
     catalogo[i].stock = parseFloat((catalogo[i].stock - cantidad).toFixed(2));
-    const costoTotal = PlatformCostTotal = cantidad * catalogo[i].pre;
+    const costoTotal = cantidad * catalogo[i].pre;
     
     db.ref('config/productos').set(catalogo);
     
@@ -339,7 +344,7 @@ function registrarVenta(i) {
     alert("Venta guardada exitosamente.");
 }
 
-// 🛡️ ADMIN MODIFICADO: CON ENTRADA DE TEXTO INLINE EN VEZ DE PROMPT
+// 🛡️ PANEL DE ADMIN: EDICIÓN COMPLETA DE PRECIO Y STOCK SIN VENTANAS INTERRUMPIDAS
 function renderizarAdmin() {
     if (!categoriaSeleccionada) {
         document.getElementById('lista-productos-admin').innerHTML = `<p style="text-align:center; color:#64748b; font-size:12px; margin-top:10px;">Selecciona una categoría.</p>`;
@@ -353,16 +358,29 @@ function renderizarAdmin() {
         encontrados++;
 
         html += `
-        <div class="producto-card" style="border-left: 2px solid var(--azul-mar); padding: 10px;">
-            <div class="flex-row">
+        <div class="producto-card" style="border-left: 2px solid var(--azul-mar); padding: 12px 10px;">
+            <div class="flex-row" style="margin-bottom: 8px;">
                 <div>
-                    <b style="font-size: 13px; color:white;">${p.nom}</b>
-                    <div style="font-size: 11px; color:#64748b;">Quedan: <b style="color:white;">${p.stock} lb</b> | Precio: <b style="color:var(--turquesa);">$${p.pre}</b></div>
+                    <b style="font-size: 14px; color:white;">${p.nom}</b>
+                    <div style="font-size: 11px; color:#64748b; margin-top: 2px;">
+                        Inventario: <b style="color:white; font-size:12px;">${p.stock} lb</b> | Precio: <b style="color:var(--turquesa); font-size:12px;">$${p.pre}</b>
+                    </div>
                 </div>
             </div>
-            <div style="display:flex; gap:6px; margin-top:6px; align-items:center;">
-                <input type="number" id="nuevo-pre-${i}" placeholder="Nuevo Precio" style="margin:0; padding:6px; font-size:12px; height:32px;">
-                <button onclick="guardarPrecioNativo(${i})" style="width:50px; background:var(--azul-mar); margin:0; padding:6px; font-size:11px; border-radius:6px; height:32px;">OK</button>
+            
+            <!-- CONTROLES NATIVOS PARA PRECIO Y LIBRAS -->
+            <div style="display:flex; gap:5px; flex-wrap: wrap;">
+                <!-- Cambiar Precio -->
+                <div style="display:flex; flex:1; min-width:130px; gap:3px;">
+                    <input type="number" id="nuevo-pre-${i}" placeholder="Nvo Precio" style="margin:0; padding:6px; font-size:11px; height:32px;">
+                    <button onclick="guardarPrecioNativo(${i})" style="width:40px; background:var(--azul-mar); margin:0; padding:6px; font-size:11px; border-radius:6px; height:32px;">$</button>
+                </div>
+                
+                <!-- Cambiar Libras (STOCK) -->
+                <div style="display:flex; flex:1; min-width:130px; gap:3px;">
+                    <input type="number" step="0.01" id="nuevo-stock-${i}" placeholder="Nvas Libras" style="margin:0; padding:6px; font-size:11px; height:32px;">
+                    <button onclick="guardarStockNativo(${i})" style="width:40px; background:var(--turquesa); margin:0; padding:6px; font-size:11px; border-radius:6px; height:32px;">Lb</button>
+                </div>
             </div>
         </div>`;
     });
@@ -378,6 +396,16 @@ function guardarPrecioNativo(i) {
     catalogo[i].pre = valor;
     db.ref('config/productos').set(catalogo);
     alert("Precio actualizado.");
+}
+
+function guardarStockNativo(i) {
+    const inputStock = document.getElementById(`nuevo-stock-${i}`);
+    const valor = parseFloat(inputStock.value);
+    if(isNaN(valor) || valor < 0) return alert("Cantidad de libras no válida.");
+    
+    catalogo[i].stock = valor;
+    db.ref('config/productos').set(catalogo);
+    alert("Inventario (libras) actualizado con éxito.");
 }
 
 function toggleModalProducto() {
